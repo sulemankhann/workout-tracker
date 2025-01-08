@@ -15,5 +15,11 @@ func (app *application) routes() http.Handler {
 		app.healthcheckHandler,
 	)
 
+	router.HandlerFunc(
+		http.MethodPost,
+		"/v1/users",
+		app.registerUserHandler,
+	)
+
 	return router
 }
