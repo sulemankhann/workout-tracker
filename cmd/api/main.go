@@ -1,9 +1,11 @@
 package main
 
 import (
-	"flag"
 	"log/slog"
 	"os"
+	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 var version = "1.0.0"
@@ -19,26 +21,41 @@ type application struct {
 }
 
 func main() {
-	var cfg config
-
-	flag.IntVar(&cfg.port, "port", 4000, "API Server port")
-	flag.StringVar(
-		&cfg.env,
-		"env",
-		"development",
-		"Environment (development|staging|production)",
-	)
-
-	flag.Parse()
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	err := godotenv.Load()
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+
+	portStr, exist := os.LookupEnv("PORT")
+	if !exist {
+		portStr = "4000"
+	}
+
+	env, exist := os.LookupEnv("ENV")
+	if !exist {
+		env = "development"
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		// invalid port, setting default port
+		port = 4000
+	}
+
+	cfg := config{
+		port: port,
+		env:  env,
+	}
 
 	app := application{
 		config: cfg,
 		logger: logger,
 	}
 
-	err := app.serve()
+	err = app.serve()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
