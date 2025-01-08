@@ -27,5 +27,5 @@ func (app *application) routes() http.Handler {
 		app.createAuthenticationTokenHandler,
 	)
 
-	return router
+	return app.authenticate(router)
 }
