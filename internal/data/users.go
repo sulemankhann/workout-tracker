@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sulemankhann/workout-tracker/internal/validator"
 	"time"
 
@@ -34,6 +35,20 @@ func (p *password) Set(plaintextPassword string) error {
 	return nil
 }
 
+func (p *password) Matches(plaintextPassword string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(p.hash, []byte(plaintextPassword))
+	if err != nil {
+		switch {
+		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
+			return false, nil
+
+		default:
+			return false, err
+		}
+	}
+	return true, nil
+}
+
 type UserModel struct {
 	DB *sql.DB
 }
@@ -63,6 +78,36 @@ func (m UserModel) Insert(user *User) error {
 	}
 
 	return nil
+}
+
+func (m UserModel) GetByEmail(email string) (*User, error) {
+	query := `
+        SELECT id, created_at, name, email, password_hash 
+        FROM users
+        WHERE email = $1`
+
+	var user User
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.Name,
+		&user.Email,
+		&user.Password.hash,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
 
 func ValidateEmail(v *validator.Validator, email string) {

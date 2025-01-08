@@ -21,5 +21,11 @@ func (app *application) routes() http.Handler {
 		app.registerUserHandler,
 	)
 
+	router.HandlerFunc(
+		http.MethodPost,
+		"/v1/tokens/authentication",
+		app.createAuthenticationTokenHandler,
+	)
+
 	return router
 }
