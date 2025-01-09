@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -80,4 +81,40 @@ func (m ExerciseModel) GetAll() ([]*Exercise, error) {
 	}
 
 	return exercises, nil
+}
+
+func (m ExerciseModel) Get(id int64) (*Exercise, error) {
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+        SELECT id, name, description, category, muscle_group, created_at, updated_at
+        FROM exercises
+        WHERE id = $1`
+
+	var exercise Exercise
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
+		&exercise.ID,
+		&exercise.Name,
+		&exercise.Description,
+		&exercise.Category,
+		&exercise.MuscleGroup,
+		&exercise.CreatedAt,
+		&exercise.UpdatedAt,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &exercise, nil
 }

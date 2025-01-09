@@ -32,5 +32,10 @@ func (app *application) routes() http.Handler {
 		app.requireAuthenticatedUser(app.listExercisesHandler),
 	)
 
+	router.HandlerFunc(http.MethodPost,
+		"/v1/workouts",
+		app.requireAuthenticatedUser(app.createWorkoutHandler),
+	)
+
 	return app.recoverPanic(app.authenticate(router))
 }
