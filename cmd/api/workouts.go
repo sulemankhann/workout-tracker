@@ -51,7 +51,7 @@ func (app *application) createWorkoutHandler(
 	workoutExercises := []data.WorkoutExercise{}
 
 	for _, exerciseInput := range input.Exercises {
-		_, err := app.models.Exercises.Get(exerciseInput.ExerciseID)
+		exercise, err := app.models.Exercises.Get(exerciseInput.ExerciseID)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
@@ -72,6 +72,7 @@ func (app *application) createWorkoutHandler(
 
 		workoutExercise := data.WorkoutExercise{
 			ExerciseID:   exerciseInput.ExerciseID,
+			Exercise:     *exercise,
 			Sets:         exerciseInput.Sets,
 			Repetitions:  exerciseInput.Repetitions,
 			Weight:       exerciseInput.Weight,
@@ -87,10 +88,9 @@ func (app *application) createWorkoutHandler(
 
 	}
 
-	err = app.models.Workouts.CreateWorkoutWithExercises(
-		workout,
-		workoutExercises,
-	)
+	workout.Exercises = workoutExercises
+
+	err = app.models.Workouts.CreateWorkoutWithExercises(workout)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -100,6 +100,29 @@ func (app *application) createWorkoutHandler(
 		w,
 		http.StatusCreated,
 		envelope{"workout": workout},
+		nil,
+	)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) listWorkoutsHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	user := app.contextGetUser(r)
+
+	workouts, err := app.models.Workouts.GetAllForUser(user.ID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(
+		w,
+		http.StatusOK,
+		envelope{"workouts": workouts},
 		nil,
 	)
 	if err != nil {

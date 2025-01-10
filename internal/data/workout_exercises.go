@@ -6,9 +6,10 @@ import (
 )
 
 type WorkoutExercise struct {
-	ID           int64     `json:"id"`
-	WorkoutID    int64     `json:"workout_id "`
-	ExerciseID   int64     `json:"exercise_id "`
+	ID           int64     `json:"-"`
+	WorkoutID    int64     `json:"-"`
+	ExerciseID   int64     `json:"-"`
+	Exercise     Exercise  `json:"exercise"`
 	Sets         int       `json:"set"`
 	Repetitions  int       `json:"repetitions"`
 	Weight       float64   `json:"weight"` // 0 for bodyweight exercises
