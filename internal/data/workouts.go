@@ -202,6 +202,35 @@ func (m WorkoutModel) GetAllForUser(userID int64) ([]*Workout, error) {
 	return workouts, nil
 }
 
+func (m WorkoutModel) DeleteByUser(id, userId int64) error {
+	if id < 1 || userId < 1 {
+		return ErrRecordNotFound
+	}
+
+	query := `
+        DELETE FROM workouts
+        WHERE id = $1
+        AND user_id = $2`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := m.DB.ExecContext(ctx, query, id, userId)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
+	return nil
+}
 func ValidateWorkout(v *validator.Validator, workout *Workout) {
 	v.Check(workout.Title != "", "title", "must be provided")
 	v.Check(
