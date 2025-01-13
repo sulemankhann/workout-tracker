@@ -36,10 +36,14 @@ func (app *application) routes() http.Handler {
 		"/v1/workouts",
 		app.requireAuthenticatedUser(app.createWorkoutHandler),
 	)
-
 	router.HandlerFunc(http.MethodGet,
 		"/v1/workouts",
 		app.requireAuthenticatedUser(app.listWorkoutsHandler),
+	)
+	router.HandlerFunc(
+		http.MethodGet,
+		"/v1/workouts/:id",
+		app.requireAuthenticatedUser(app.showWorkoutHandler),
 	)
 	router.HandlerFunc(
 		http.MethodDelete,

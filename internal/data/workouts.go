@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sulemankhann/workout-tracker/internal/validator"
 	"time"
@@ -231,6 +232,93 @@ func (m WorkoutModel) DeleteByUser(id, userId int64) error {
 
 	return nil
 }
+
+func (m WorkoutModel) GetByUser(id, userId int64) (*Workout, error) {
+	if id < 1 || userId < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	query := `
+        SELECT id, user_id, title, description, scheduled_at, created_at, updated_at        
+        FROM workouts
+        WHERE id = $1 AND user_id = $2`
+
+	var workout Workout
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, id, userId).Scan(
+		&workout.ID,
+		&workout.UserID,
+		&workout.Title,
+		&workout.Description,
+		&workout.ScheduledAt,
+		&workout.CreatedAt,
+		&workout.UpdatedAt,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	query = `
+        SELECT 
+            we.sets, we.repetitions, we.weight, we.rest_interval,
+            e.id as exercise_id, e.name, e.description, e.category, e.muscle_group
+        FROM workout_exercises we
+        JOIN exercises e ON we.exercise_id = e.id
+        WHERE we.workout_id = $1
+    `
+	exerciseRows, err := m.DB.QueryContext(ctx, query, workout.ID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to execute query to fetch exercises for workout %d: %w",
+			workout.ID,
+			err,
+		)
+	}
+	defer exerciseRows.Close()
+
+	for exerciseRows.Next() {
+		var workoutExercise WorkoutExercise
+
+		err := exerciseRows.Scan(
+			&workoutExercise.Sets,
+			&workoutExercise.Repetitions,
+			&workoutExercise.Weight,
+			&workoutExercise.RestInterval,
+			&workoutExercise.Exercise.ID,
+			&workoutExercise.Exercise.Name,
+			&workoutExercise.Exercise.Description,
+			&workoutExercise.Exercise.Category,
+			&workoutExercise.Exercise.MuscleGroup,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to scan exercise row for workout %d: %w",
+				workout.ID,
+				err,
+			)
+		}
+
+		workout.Exercises = append(workout.Exercises, workoutExercise)
+	}
+
+	if err = exerciseRows.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"error occurred while iterating over exercise rows: %w",
+			err,
+		)
+	}
+
+	return &workout, nil
+}
+
 func ValidateWorkout(v *validator.Validator, workout *Workout) {
 	v.Check(workout.Title != "", "title", "must be provided")
 	v.Check(
