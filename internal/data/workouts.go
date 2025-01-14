@@ -383,6 +383,35 @@ func (m WorkoutModel) GetByUser(id, userId int64) (*Workout, error) {
 	return &workout, nil
 }
 
+func (m WorkoutModel) ScheduleWorkout(workout *Workout) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	query := `
+        UPDATE workouts
+        SET scheduled_at = $2
+        WHERE id = $1`
+
+	args := []any{
+		workout.ID,
+		workout.ScheduledAt,
+	}
+
+	_, err = tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func ValidateWorkout(v *validator.Validator, workout *Workout) {
 	v.Check(workout.Title != "", "title", "must be provided")
 	v.Check(

@@ -55,6 +55,11 @@ func (app *application) routes() http.Handler {
 		"/v1/workouts/:id",
 		app.requireAuthenticatedUser(app.deleteWorkoutHandler),
 	)
+	router.HandlerFunc(
+		http.MethodPost,
+		"/v1/workouts/:id/schedule",
+		app.requireAuthenticatedUser(app.scheduleWorkoutHandler),
+	)
 
 	return app.recoverPanic(app.authenticate(router))
 }

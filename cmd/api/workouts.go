@@ -317,3 +317,73 @@ func (app *application) deleteWorkoutHandler(
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) scheduleWorkoutHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	user := app.contextGetUser(r)
+
+	workout, err := app.models.Workouts.GetByUser(id, user.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+
+		return
+
+	}
+
+	var input struct {
+		ScheduledAt time.Time `json:"scheduled_at"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+
+	v.Check(
+		input.ScheduledAt.After(
+			time.Now(),
+		),
+		"scheduled_at",
+		"must not be in the past",
+	)
+
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	workout.ScheduledAt = input.ScheduledAt
+
+	err = app.models.Workouts.ScheduleWorkout(workout)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(
+		w,
+		http.StatusOK,
+		envelope{"workout": workout},
+		nil,
+	)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
