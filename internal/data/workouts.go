@@ -86,6 +86,70 @@ func (m WorkoutModel) CreateWorkoutWithExercises(workout *Workout) error {
 	return nil
 }
 
+func (m WorkoutModel) UpdateWorkoutWithExercises(workout *Workout) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	query := `
+        UPDATE workouts
+        SET title = $2, description = $3, scheduled_at = $4
+        WHERE id = $1`
+
+	args := []any{
+		workout.ID,
+		workout.Title,
+		workout.Description,
+		workout.ScheduledAt,
+	}
+
+	_, err = tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	// Delete all existing exercises for this workout
+	query = `DELETE FROM workout_exercises WHERE workout_id = $1`
+	_, err = tx.ExecContext(ctx, query, workout.ID)
+	if err != nil {
+		return err
+	}
+
+	// Insert the new exercises
+	for _, workoutExercise := range workout.Exercises {
+		query = `
+		INSERT INTO workout_exercises (workout_id, exercise_id, sets, repetitions, weight, rest_interval)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+		args = []any{
+			workout.ID,
+			workoutExercise.ExerciseID,
+			workoutExercise.Sets,
+			workoutExercise.Repetitions,
+			workoutExercise.Weight,
+			workoutExercise.RestInterval,
+		}
+
+		_, err = tx.ExecContext(ctx, query, args...)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m WorkoutModel) GetAllForUser(userID int64) ([]*Workout, error) {
 	query := `
 	       SELECT id, user_id, title, description, scheduled_at, created_at, updated_at
